@@ -1,19 +1,20 @@
 import sys
-from PyQt5.QtGui import QPainter, QPen, QColor
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication, QLabel, QPushButton
-from PyQt5.QtCore import Qt, QThread
-from random import shuffle
+from PyQt5.QtGui import QPainter, QFont, QColor
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication, QLabel, QPushButton, QHBoxLayout
+from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
+from random import shuffle, randint
 from A_Star import Node, Environment
 
 # NOTES:
 # Random.Shuffle() is a function that shuffles the elements of a list in place.
 # Constants
+CELL_SPACING = 10 
 CELL_COUNT = 3
 CELL_SIZE = 100
 GRID_ORIGINX = 350
 GRID_ORIGINY = 350
-W_WIDTH = 500
-W_HEIGHT = 500
+W_WIDTH = 600
+W_HEIGHT = 600
 
 ###############################
 # Name: Grid Widget
@@ -31,6 +32,7 @@ class GridWidget(QWidget):
         self.initalize_board() # Create the board
         self.turns_label = turns_label # Set turns label
         self.game_over = False # Determins if game is over
+        self.setStyleSheet("background-color: #1a1a1a; border: 5px solid #FFD700;")
         self.show()
     
     # Name: Initalize Board
@@ -61,6 +63,13 @@ class GridWidget(QWidget):
         for i in range(len(self.board)):
             if self.board[i] == -1:
                 return self.rows - (i // self.rows)
+    
+    # Name: Flash Colors
+    # Desc: Makes grid glash
+    def flash_colors(self):
+        # Set each cell to a random color
+        self.cell_colors = [QColor(randint(0, 255), randint(0, 255), randint(0, 255)) for _ in range(self.rows * self.cols)]
+        self.update()  # Trigger a repaint with new colors
           
     # Name: Is Solvable
     # Desc: Returns True if the board is solbable 
@@ -85,7 +94,7 @@ class GridWidget(QWidget):
     def paintEvent(self, event):
         qp = QPainter()
         qp.begin(self)
-        #qp.fillRect(event.rect(), QColor(250, 150, 0))
+        qp.setFont(QFont("Courier", 20, QFont.Bold))
 
 
         index = 0 # Index 
@@ -94,15 +103,15 @@ class GridWidget(QWidget):
         for row in range(self.rows):
             for col in range(self.cols):
                 # Calculate position for each cell
-                x = col * CELL_SIZE
-                y = row * CELL_SIZE
+                x = col * (CELL_SIZE + CELL_SPACING)
+                y = row * (CELL_SIZE + CELL_SPACING)
 
                 # Check if this is the blank (-1) square
                 if self.board[index] == -1:
                     # Fill the blank square with red
                     qp.fillRect(x, y, CELL_SIZE, CELL_SIZE, QColor(255, 0, 0))  # Red color
                 else:
-                    qp.setPen(QColor(255, 255, 255))
+                    qp.setPen(QColor(255, 255, 0))
                     # Draw the grid cell normally
                     qp.drawRect(x, y, CELL_SIZE, CELL_SIZE)
                     # Draw the number
@@ -284,21 +293,47 @@ class MainWindow(QWidget):
         self.setWindowTitle("Main Window")
         layout = QVBoxLayout()  # Vertical Layout
         self.setLayout(layout)
-        self.setGeometry(300, 300, W_WIDTH, W_HEIGHT)
+        self.setGeometry(500, 500, W_WIDTH, W_HEIGHT)
 
         self.button = QPushButton("Start")
+        self.button.setStyleSheet("background-color: #FF00FF; color: #000000; font-weight: bold; font-size: 16px;")
         layout.addWidget(self.button)
         
         #Add an automate button
         self.autoButton = QPushButton("Auto")
+        self.autoButton.setStyleSheet("background-color: #00FFFF; color: #000000; font-weight: bold; font-size: 16px;")
         layout.addWidget(self.autoButton)
 
         self.grid = None
         self.turns_label = None
 
+        # Loading label and timer setup
+        self.loading_label = QLabel("")
+        self.loading_label.setStyleSheet("color: #FFD700; font-size: 18px; font-weight: bold;")
+        layout.addWidget(self.loading_label)
+
+        # Flashing timer for color change
+        self.flash_timer = QTimer(self)
+        self.flash_timer.timeout.connect(self.flash_grid_colors)
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_loading_text)
+
+        self.loading_text = "Loading"
+        self.loading_dots = 0
+        self.solution_thread = None  
+
         #Assign Button Functionalitys
         self.button.clicked.connect(self.on_clicked) #Assigns function to button click
         self.autoButton.clicked.connect(self.auto_on_clicked)
+
+        self.setStyleSheet("background-color: #2b2b2b; color: #FFD700; font-family: 'Courier New';")
+
+    def update_loading_text(self):
+        # Cycles through adding dots to simulate loading
+        self.loading_dots = (self.loading_dots + 1) % 4
+        self.loading_label.setText(self.loading_text + "." * self.loading_dots)
+
 
     # Name: Auto On Clicked
     # Desc: Start or stop automation Process
@@ -307,15 +342,28 @@ class MainWindow(QWidget):
 
             # Set up the A* environment with the current board state
             if self.grid:
+                self.autoButton.setText("Stop Auto")
+                self.loading_label.setText("Loading")
+
+                # Start timers
+                self.timer.start(500) 
+                self.flash_timer.start(300)
+
+                # Start solution thread
                 env = Environment(self.grid.board)
-                end_node = env.solve()
-                
-                # Display the steps if a solution is found
-                if end_node:
-                    solution_path = env.reconstruct_path(end_node)
-                    self.display_solution(solution_path)
+                self.solution_thread = SolutionThread(env)
+                self.solution_thread.solution_found.connect(self.display_solution)
+                self.solution_thread.start()
+
         else:
-            pass
+            self.autoButton.setText("Auto")
+            self.timer.stop()
+            self.flash_timer.stop()
+            self.loading_label.setText("")
+            # Stop the solution thread if running
+            if self.solution_thread and self.solution_thread.isRunning():
+                self.solution_thread.stop()
+                self.solution_thread = None
 
     #Name: Display Solution
     # Desc: Display solution steps
@@ -340,13 +388,17 @@ class MainWindow(QWidget):
             self.button.setText("Stop")
 
             # Create Grid
-            self.turns_label = QLabel(f'Turns: 0')
+            self.turns_label = QLabel("Turns: 0")
+            self.turns_label.setStyleSheet("color: #FFD700; font-size: 18px; font-weight: bold;")
             self.grid = GridWidget(self.turns_label)  
             self.grid.setFixedSize(W_WIDTH - 50, W_HEIGHT - 100)
 
             # Add grid and label to the layout
-            self.layout().addWidget(self.grid)
             self.layout().addWidget(self.turns_label)
+            self.layout().addWidget(self.grid)
+            
+            # Use the center_grid function to center the grid widget
+            self.center_grid()
         else:
             # Change the button text back too start
             self.button.setText("Start")
@@ -356,8 +408,50 @@ class MainWindow(QWidget):
             self.grid = None  # Delete the grid
             self.turns_label.setParent(None) # Detatch the label 
             self.turns_label = None # Delete the label
+    
+    # Name: Center Grid
+    # Desc: Centers Grid
+    def center_grid(self):
+        # Create a horizontal layout to center the grid
+        h_layout = QHBoxLayout()
+        h_layout.addStretch()  # Add space before the grid to center it
+        h_layout.addWidget(self.grid)
+        h_layout.addStretch()  # Add space after the grid to center it
+        self.layout().addLayout(h_layout)
+    
+    # Name: Flash Grid
+    # Desc: Flashed colors
+    def flash_grid_colors(self):
+        if self.grid:
+            self.grid.flash_colors()
 
         
+# Name: Solution Thread
+# Desc: 
+class SolutionThread(QThread):
+    solution_found = pyqtSignal(object)  # Signal to send the solution path
+
+    def __init__(self, env):
+        super().__init__()
+        self.env = env
+        self._running = True  # Add a flag to control the thread execution
+
+    def run(self):
+        # Only run if _running is True
+        end_node = None
+        if self._running:
+            end_node = self.env.solve()
+
+        if end_node and self._running:
+            solution_path = self.env.reconstruct_path(end_node)
+            self.solution_found.emit(solution_path)
+
+    def stop(self):
+        # Set _running to False to halt the run
+        self._running = False
+        self.quit()
+        self.wait()
+
 # Name: Main Function
 # Desc: Runs the program
 if __name__ == "__main__":
@@ -365,3 +459,4 @@ if __name__ == "__main__":
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
+
