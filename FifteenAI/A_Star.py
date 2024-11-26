@@ -167,11 +167,11 @@ class Environment:
             visited.add(board_tuple)
             
             # Print the current node's board and cost
-            print("Board:", current_node.board, "| Cost:", current_node.cost, "| Heuristic:", current_node.heuristic, "| Priority:", priority)
+            #print("Board:", current_node.board, "| Cost:", current_node.cost, "| Heuristic:", current_node.heuristic, "| Priority:", priority)
             
             # Check if the current node is the goal
             if current_node.is_solved():
-                print("Solution found!")
+                #print("Solution found!")
                 return current_node
             
             # Generate moves and add them to the frontier
@@ -182,7 +182,7 @@ class Environment:
                 heapq.heappush(self.frontier, (neighbor_priority, self.counter, neighbor))
                 self.counter += 1
                 
-        print("No solution found.")
+        #print("No solution found.")
         return None 
     
     def reconstruct_path(self, final_node):
@@ -198,10 +198,10 @@ class Environment:
         path.reverse()
 
         # Display the steps
-        for step, node in enumerate(path):
-            print(f"Step {step}:")
-            print(node.board)  # Assuming each node has a 'state' attribute representing the board
-            print()  # Blank line for readability
+        #for step, node in enumerate(path):
+            #print(f"Step {step}:")
+            #print(node.board)  # Assuming each node has a 'state' attribute representing the board
+            #print()  # Blank line for readability
 
         return path
     
