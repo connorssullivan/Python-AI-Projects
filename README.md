@@ -8,6 +8,10 @@ This repository contains projects developed for COSC411 (Artificial Intelligence
 ### 1. Fifteen Puzzle Solver (A* Search)
 A sophisticated implementation of the classic 15-puzzle game with an AI solver using the A* search algorithm. The solver employs multiple heuristic techniques to find optimal solutions efficiently:
 
+Demo:
+https://github.com/user-attachments/assets/0c6dde48-c416-4c43-ad55-024c3efa9675
+
+
 - **Advanced Heuristics**:
   - Manhattan Distance
   - Linear Conflicts Detection
@@ -25,6 +29,9 @@ A sophisticated implementation of the classic 15-puzzle game with an AI solver u
 
 ### 2. Graph Path Search
 An implementation of various graph search algorithms to find optimal paths between cities in the United States. The project visualizes and compares different search strategies.
+
+Example:
+<img width="840" alt="Screenshot 2025-04-15 at 9 29 56 PM" src="https://github.com/user-attachments/assets/8b53947d-d56c-4293-b592-d8371abcbfee" />
 
 **Features:**
 - Multiple search algorithms:
@@ -61,7 +68,7 @@ Total Distance: 1046
 - **Semester**: Spring 2024
 
 ## Author
-[Your Name]
+Connor Sullivan
 
 ## Acknowledgments
 Special thanks to the course instructor and teaching assistants for their guidance throughout these projects. 
