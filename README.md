@@ -8,7 +8,7 @@ This repository contains projects developed for COSC411 (Artificial Intelligence
 ### 1. Fifteen Puzzle Solver (A* Search)
 A sophisticated implementation of the classic 15-puzzle game with an AI solver using the A* search algorithm. The solver employs multiple heuristic techniques to find optimal solutions efficiently:
 
-[View Demo Video](https://github.com/user-attachments/assets/0c6dde48-c416-4c43-ad55-024c3efa9675)
+![battleshipDemo](https://github.com/user-attachments/assets/0c6dde48-c416-4c43-ad55-024c3efa9675)
 
 
 - **Advanced Heuristics**:
