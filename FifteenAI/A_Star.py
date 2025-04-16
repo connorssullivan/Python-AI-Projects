@@ -28,6 +28,39 @@
 
 import heapq
 import math
+import numpy as np
+
+class PatternDatabase:
+    def __init__(self, size=4):
+        self.size = size
+        self.patterns = {}
+        self.initialize_patterns()
+    
+    def initialize_patterns(self):
+        # Create pattern databases for different groups of tiles
+        # For 15-puzzle, we'll use 3 groups: 1-5, 6-10, 11-15
+        self.patterns['group1'] = self.build_pattern_db(range(1, 6))
+        self.patterns['group2'] = self.build_pattern_db(range(6, 11))
+        self.patterns['group3'] = self.build_pattern_db(range(11, 16))
+    
+    def build_pattern_db(self, tile_group):
+        # Simplified pattern database implementation
+        # In a full implementation, this would precompute and store all possible patterns
+        db = {}
+        for tile in tile_group:
+            goal_pos = (tile - 1) // self.size, (tile - 1) % self.size
+            db[tile] = goal_pos
+        return db
+    
+    def get_pattern_cost(self, board):
+        cost = 0
+        for group, pattern in self.patterns.items():
+            for tile, goal_pos in pattern.items():
+                if tile in board:
+                    idx = board.index(tile)
+                    current_pos = (idx // self.size, idx % self.size)
+                    cost += abs(current_pos[0] - goal_pos[0]) + abs(current_pos[1] - goal_pos[1])
+        return cost
 
 class Node:
     # Name: Constructor
@@ -44,6 +77,7 @@ class Node:
         
         # Set Nodes heuristic
         self.heuristic = self.check_heuristic(self.board)
+        self.hash = hash(tuple(self.board))  # Precompute hash for faster comparisons
 
     #Name Generate Moves
     # Desc: Gene
@@ -58,45 +92,19 @@ class Node:
         # List to hold possible moves as new nodes
         frontier = []
 
-        # Go through the board
-        # Loop through each tile in the board
-        for idx, num in enumerate(self.board):
-            # If it is blank (-1), skip it
-            if num == -1:
-                continue
+        # Define possible moves in order of preference (up, down, left, right)
+        moves = [
+            (row > 0, blank_index - size),  # up
+            (row < size - 1, blank_index + size),  # down
+            (col > 0 and blank_index % size != 0, blank_index - 1),  # left
+            (col < size - 1 and blank_index % size != size - 1, blank_index + 1)  # right
+        ]
 
-            # If you can move up
-            if row > 0 and idx == blank_index - size:
+        for can_move, target_idx in moves:
+            if can_move:
                 # Create a new board by swapping with the blank space
                 new_board = self.board[:]
-                new_board[blank_index], new_board[idx] = new_board[idx], new_board[blank_index]
-                # Create new Node and add to the frontier
-                new_node = Node(new_board, Parent=self)
-                frontier.append(new_node)
-
-            # If you can move down
-            if row < size - 1 and idx == blank_index + size:
-                # Create a new board by swapping with the blank space
-                new_board = self.board[:]
-                new_board[blank_index], new_board[idx] = new_board[idx], new_board[blank_index]
-                # Create new Node and add to the frontier
-                new_node = Node(new_board, Parent=self)
-                frontier.append(new_node)
-
-            # If you can move left
-            if col > 0 and idx == blank_index - 1 and blank_index % size != 0:
-                # Create a new board by swapping with the blank space
-                new_board = self.board[:]
-                new_board[blank_index], new_board[idx] = new_board[idx], new_board[blank_index]
-                # Create new Node and add to the frontier
-                new_node = Node(new_board, Parent=self)
-                frontier.append(new_node)
-
-            # If you can move right
-            if col < size - 1 and idx == blank_index + 1 and blank_index % size != size - 1:
-                # Create a new board by swapping with the blank space
-                new_board = self.board[:]
-                new_board[blank_index], new_board[idx] = new_board[idx], new_board[blank_index]
+                new_board[blank_index], new_board[target_idx] = new_board[target_idx], new_board[blank_index]
                 # Create new Node and add to the frontier
                 new_node = Node(new_board, Parent=self)
                 frontier.append(new_node)
@@ -110,28 +118,42 @@ class Node:
     # Uses manhatan distance to fin
     def check_heuristic(self, board):
         size = int(math.sqrt(len(board)))
-
-        # Target position for each tile in the solved board
-        goal = {(i+1): (i // size, i % size) for i in range(size * size - 1)}
-        goal[-1] = (size - 1, size - 1)
-
-        distance = 0
-
-        # Go throgh the board
+        pattern_db = PatternDatabase(size)
+        
+        # Manhattan distance
+        manhattan = 0
         for idx, value in enumerate(board):
             if value == -1:
-                continue  # Ignore blank 
-            
-            # Current Row and Column
+                continue
             current_row, current_col = idx // size, idx % size
-            
-            # Goal row and column
-            goal_row, goal_col = goal[value]
-            
-            # Add the Manhattan distance for this tile
-            distance += abs(current_row - goal_row) + abs(current_col - goal_col)
+            goal_row, goal_col = (value - 1) // size, (value - 1) % size
+            manhattan += abs(current_row - goal_row) + abs(current_col - goal_col)
         
-        return distance
+        # Linear conflicts
+        linear_conflicts = 0
+        for i in range(size):
+            row = board[i*size:(i+1)*size]
+            col = board[i::size]
+            linear_conflicts += self.count_linear_conflicts(row)
+            linear_conflicts += self.count_linear_conflicts(col)
+        
+        # Pattern database cost
+        pattern_cost = pattern_db.get_pattern_cost(board)
+        
+        # Combine heuristics with weights
+        return manhattan + 2 * linear_conflicts + pattern_cost
+
+    def count_linear_conflicts(self, line):
+        conflicts = 0
+        for i, tile1 in enumerate(line):
+            if tile1 == -1:
+                continue
+            for j, tile2 in enumerate(line[i+1:], i+1):
+                if tile2 == -1:
+                    continue
+                if tile1 > tile2 and (tile1 - 1) // len(line) == (tile2 - 1) // len(line):
+                    conflicts += 2
+        return conflicts
     
     # Name: Is Solved
     # Desc: Checks if the puzzle is soved
@@ -147,10 +169,9 @@ class Environment:
         # Add initial node to the heap with (priority, counter, node)
         heapq.heappush(self.frontier, (self.initial_node.heuristic + self.initial_node.cost, self.counter, self.initial_node))
         self.counter += 1
+        self.visited = set()
 
     def solve(self):
-        visited = set()  # Set to track visited board states
-
         # Go through the frontier
         while self.frontier:
             # Pop node with the lowest priority
@@ -160,11 +181,11 @@ class Environment:
             board_tuple = tuple(current_node.board)
             
             #If board is in visted
-            if board_tuple in visited:
+            if board_tuple in self.visited:
                 continue
 
             # Add board to visted
-            visited.add(board_tuple)
+            self.visited.add(board_tuple)
             
             # Print the current node's board and cost
             #print("Board:", current_node.board, "| Cost:", current_node.cost, "| Heuristic:", current_node.heuristic, "| Priority:", priority)
@@ -176,11 +197,12 @@ class Environment:
             
             # Generate moves and add them to the frontier
             for neighbor in current_node.generate_moves():
-                # Calculate priority for the neighbor
-                neighbor_priority = neighbor.heuristic + neighbor.cost
-                # Add the neighbor to the heap
-                heapq.heappush(self.frontier, (neighbor_priority, self.counter, neighbor))
-                self.counter += 1
+                if neighbor.hash not in self.visited:
+                    # Calculate priority for the neighbor
+                    neighbor_priority = neighbor.heuristic + neighbor.cost
+                    # Add the neighbor to the heap
+                    heapq.heappush(self.frontier, (neighbor_priority, self.counter, neighbor))
+                    self.counter += 1
                 
         #print("No solution found.")
         return None 
