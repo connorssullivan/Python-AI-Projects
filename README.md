@@ -1,4 +1,4 @@
-# COSC411 - Artificial Intelligence Projects
+# Python - Artificial Intelligence Projects
 ## Salisbury University
 
 This repository contains projects developed for COSC411 (Artificial Intelligence) at Salisbury University. These projects demonstrate various AI algorithms and problem-solving techniques.
